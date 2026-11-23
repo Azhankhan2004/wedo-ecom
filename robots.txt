@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://azhankhan2004.github.io/wedo-ecom/sitemap.xml
+Sitemap: https://wedo-ecom.vercel.app/sitemap.xml

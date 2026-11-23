@@ -29,7 +29,6 @@ wedo-ecom/
 ├── index.html, services.html, ...   ← pages
 ├── assets/
 │   ├── css/main.css                 ← all styles (theme colours at the top)
-│   ├── fonts/                       ← Archivo variable font (self-hosted)
 │   ├── img/                         ← favicon, social share image
 │   ├── js/
 │   │   ├── config.js                ← ✏️ contact links, WhatsApp, Google Form
@@ -55,7 +54,7 @@ The ✏️ files are the only ones you need for day-to-day updates. See **[docs/
 - [ ] `assets/js/data/gallery.js` — add real creatives to `assets/media/gallery/`
 - [ ] Connect the Google Form (optional — without it, the form sends inquiries to WhatsApp)
 - [x] Social share image `assets/img/og-image.png` (1200×630) is included; replace it any time
-- [ ] If you use a custom domain, update the URLs in `sitemap.xml`, `robots.txt` and the `<link rel="canonical">` tags
+- [ ] If the Vercel URL changes or you add a custom domain, update the URLs in `sitemap.xml`, `robots.txt` and the `<link rel="canonical">` tags
 
 ## Run it locally
 
@@ -71,12 +70,23 @@ Or in VS Code, install the **Live Server** extension, right-click `index.html` �
 
 You can also double-click `index.html` to open it directly; everything works without a server.
 
-## Deploy on GitHub Pages (free)
+## Live site (Vercel)
+
+The site is deployed on Vercel at **https://wedo-ecom.vercel.app** (Vercel project `wedo-ecom`).
+
+To update it, either connect this folder's GitHub repo to the Vercel project (every push then deploys automatically), or install the Vercel CLI and run:
+
+```bash
+npm i -g vercel
+vercel --prod
+```
+
+## Deploy on GitHub Pages (alternative, also free)
 
 1. On GitHub, open the repo → **Settings** → **Pages**.
 2. Under **Build and deployment**, choose **Deploy from a branch**.
 3. Pick branch **main**, folder **/ (root)** → **Save**.
-4. After a minute the site is live at `https://azhankhan2004.github.io/wedo-ecom/`.
+4. After a minute the site is live at `https://wedo-ecom.vercel.app/`.
 
 To use your own domain (e.g. `wedoecom.com`), add it in the same Pages settings and point your domain's DNS to GitHub Pages.
 
@@ -92,7 +102,7 @@ To use your own domain (e.g. `wedoecom.com`), add it in the same Pages settings 
 
 **Typography:** Archivo variable. Headlines use the expanded width (`wdth` 110–125) for a bold, futuristic look; body text uses the normal width.
 
-**Accessibility and performance:** keyboard-friendly navigation, visible focus states, reduced-motion support, semantic HTML, lazy-loaded images, self-hosted fonts, no external scripts.
+**Accessibility and performance:** keyboard-friendly navigation, visible focus states, reduced-motion support, semantic HTML, lazy-loaded images, no tracking or third-party scripts.
 
 ## Licence
 

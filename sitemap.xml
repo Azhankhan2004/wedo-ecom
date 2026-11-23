@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <url><loc>https://azhankhan2004.github.io/wedo-ecom/</loc><priority>1.0</priority></url>
-  <url><loc>https://azhankhan2004.github.io/wedo-ecom/services.html</loc><priority>0.9</priority></url>
-  <url><loc>https://azhankhan2004.github.io/wedo-ecom/case-studies.html</loc><priority>0.9</priority></url>
-  <url><loc>https://azhankhan2004.github.io/wedo-ecom/gallery.html</loc><priority>0.8</priority></url>
-  <url><loc>https://azhankhan2004.github.io/wedo-ecom/process.html</loc><priority>0.7</priority></url>
-  <url><loc>https://azhankhan2004.github.io/wedo-ecom/about.html</loc><priority>0.7</priority></url>
-  <url><loc>https://azhankhan2004.github.io/wedo-ecom/contact.html</loc><priority>0.9</priority></url>
+  <url><loc>https://wedo-ecom.vercel.app/</loc><priority>1.0</priority></url>
+  <url><loc>https://wedo-ecom.vercel.app/services.html</loc><priority>0.9</priority></url>
+  <url><loc>https://wedo-ecom.vercel.app/case-studies.html</loc><priority>0.9</priority></url>
+  <url><loc>https://wedo-ecom.vercel.app/gallery.html</loc><priority>0.8</priority></url>
+  <url><loc>https://wedo-ecom.vercel.app/process.html</loc><priority>0.7</priority></url>
+  <url><loc>https://wedo-ecom.vercel.app/about.html</loc><priority>0.7</priority></url>
+  <url><loc>https://wedo-ecom.vercel.app/contact.html</loc><priority>0.9</priority></url>
 </urlset>
