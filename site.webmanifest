@@ -1,0 +1,9 @@
+{
+  "name": "WeDo Ecom",
+  "short_name": "WeDo Ecom",
+  "icons": [{ "src": "assets/img/favicon.svg", "sizes": "any", "type": "image/svg+xml" }],
+  "theme_color": "#050506",
+  "background_color": "#050506",
+  "display": "standalone",
+  "start_url": "./index.html"
+}
