@@ -19,20 +19,23 @@ Built as a fast, dependency-free static site (HTML, CSS and vanilla JavaScript).
 | Creative gallery | `gallery.html` | Filterable masonry gallery with lightbox (images and videos) |
 | Growth process | `process.html` | The four-step workflow |
 | About | `about.html` | Who we are, mission, vision, approach |
-| Contact | `contact.html` | Inquiry form + WhatsApp, Discord, booking and email |
+| Contact | `contact.html` | Inquiry form with project summary + WhatsApp, Discord, booking and email |
+| Studio Manager | `studio.html` | Private editor (not in the menus) to preview case studies, gallery, prices and links in your browser, then export the files to upload to GitHub |
 | 404 | `404.html` | Not-found page |
 
 ## Folder structure
 
 ```
 wedo-ecom/
-├── index.html, services.html, ...   ← pages
+├── index.html, services.html, ...   ← pages (including studio.html)
 ├── assets/
 │   ├── css/main.css                 ← all styles (theme colours at the top)
 │   ├── img/                         ← favicon, social share image
 │   ├── js/
 │   │   ├── config.js                ← ✏️ contact links, WhatsApp, Google Form
-│   │   ├── main.js                  ← site logic (header, footer, gallery, form…)
+│   │   ├── store.js                 ← browser persistence + JS export helpers
+│   │   ├── main.js                  ← site logic (header, footer, modals, gallery, form…)
+│   │   ├── studio.js                ← Studio Manager UI logic
 │   │   └── data/
 │   │       ├── packages.js          ← ✏️ package tiers and prices
 │   │       ├── case-studies.js      ← ✏️ case studies

@@ -1,14 +1,15 @@
 /* ==========================================================================
    WeDo Ecom — site script
-   Renders the shared header/footer, wires contact links from config.js,
-   and builds the dynamic sections (packages, case studies, gallery, form).
-   Each page sets <body data-page="..."> to decide what runs.
+   Renders the shared header/footer, wires contact links & smart modals,
+   handles scroll reveals, Before/After slider, packages, case studies,
+   gallery lightbox, and the AI-brief contact workflow.
    ========================================================================== */
 (function () {
   "use strict";
 
   var W = window.WEDO || {};
   var cfg = W.config || {};
+  var store = W.store || {};
   var $ = function (s, el) { return (el || document).querySelector(s); };
   var $$ = function (s, el) { return Array.prototype.slice.call((el || document).querySelectorAll(s)); };
   var page = document.body.getAttribute("data-page") || "";
@@ -17,6 +18,10 @@
     return String(str == null ? "" : str).replace(/[&<>"']/g, function (c) {
       return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
     });
+  }
+
+  function isPlaceholder(val, kind) {
+    return store.isPlaceholder ? store.isPlaceholder(val, kind) : !val;
   }
 
   /* ---------- Icons ---------- */
@@ -43,11 +48,284 @@
     email: "mailto:" + (cfg.email || "")
   };
 
+  /* ---------- Delivering requests to WeDo Ecom ----------
+     Bookings and inquiries go to the first real channel set in config.js:
+     WhatsApp, then email, then Instagram. Nothing is "sent" without one. */
+  function deliveryChannel() {
+    if (!isPlaceholder(cfg.whatsappNumber, "whatsapp")) return "whatsapp";
+    if (!isPlaceholder(cfg.email, "email")) return "email";
+    if ((cfg.socials || {}).instagram) return "instagram";
+    return null;
+  }
+  function copyText(text) {
+    try { if (navigator.clipboard) navigator.clipboard.writeText(text); } catch (e) {}
+  }
+  function deliver(subject, text) {
+    var ch = deliveryChannel(), href = null;
+    if (ch === "whatsapp") href = links.whatsapp(text);
+    if (ch === "email") href = "mailto:" + cfg.email + "?subject=" + encodeURIComponent(subject) + "&body=" + encodeURIComponent(text);
+    if (ch === "instagram") { href = cfg.socials.instagram; copyText(text); }
+    if (href) {
+      if (ch === "email") location.href = href;
+      else window.open(href, "_blank", "noopener");
+    }
+    return { channel: ch, href: href, text: text };
+  }
+  function deliveryHtml(sent, copyId) {
+    var again = sent.href ? ' If it didn\'t open, <a class="text-link" href="' + esc(sent.href) + '"' + (sent.channel === "email" ? "" : ' target="_blank" rel="noopener"') + ">open it again</a>." : "";
+    var msg = {
+      whatsapp: "<b>Almost done.</b> WhatsApp opened with your details filled in. Press send there, and we'll reply within one working day." + again,
+      email: "<b>Almost done.</b> Your email app opened with your details filled in. Press send, and we'll reply within one working day." + again,
+      instagram: "<b>Almost done.</b> We copied your details. Paste them in a message to us on Instagram, which just opened." + again
+    }[sent.channel] || "<b>Not sent yet.</b> Our contact details are still being set up. Copy your details below and keep them handy, then send them to us once our contact links are live.";
+    return msg + '<div class="btn-row" style="margin-top:.85rem"><button class="btn btn--ghost btn--sm" type="button" id="' + copyId + '">Copy my details</button></div>';
+  }
+  function bindCopy(root, copyId, text) {
+    var b = root.querySelector("#" + copyId);
+    if (b) b.addEventListener("click", function () { copyText(text); b.textContent = "Copied"; });
+  }
+
+  /* ---------- Smart Strategy Call & Connect Modals ---------- */
+  var activeModal = null;
+  var modalLastFocus = null;
+
+  function ensureModalRoot() {
+    var root = $("#wedo-modal");
+    if (root) return root;
+    root = document.createElement("div");
+    root.id = "wedo-modal";
+    root.className = "modal-backdrop";
+    root.setAttribute("role", "dialog");
+    root.setAttribute("aria-modal", "true");
+    root.innerHTML = '<div class="modal-dialog"></div>';
+    document.body.appendChild(root);
+    root.addEventListener("click", function (e) {
+      if (e.target === root) closeModal();
+    });
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "Escape" && activeModal) closeModal();
+    });
+    return root;
+  }
+
+  function openModal(label, html) {
+    var root = ensureModalRoot();
+    root.setAttribute("aria-label", label);
+    $(".modal-dialog", root).innerHTML = html;
+    modalLastFocus = document.activeElement;
+    root.classList.add("is-open");
+    document.body.style.overflow = "hidden";
+    activeModal = root;
+    var closeBtn = $(".modal-close", root);
+    if (closeBtn) closeBtn.focus();
+    wireModalClose(root);
+    return root;
+  }
+
+  function closeModal() {
+    if (!activeModal) return;
+    activeModal.classList.remove("is-open");
+    document.body.style.overflow = "";
+    activeModal = null;
+    if (modalLastFocus && typeof modalLastFocus.focus === "function") modalLastFocus.focus();
+  }
+
+  function wireModalClose(root) {
+    var closeBtn = $(".modal-close", root);
+    if (closeBtn) closeBtn.addEventListener("click", closeModal);
+  }
+
+  function nextBusinessDays(count) {
+    var days = [];
+    var d = new Date();
+    while (days.length < count) {
+      d.setDate(d.getDate() + 1);
+      var day = d.getDay();
+      if (day === 0) continue; // skip Sunday
+      days.push({
+        iso: d.toISOString().slice(0, 10),
+        label: d.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })
+      });
+    }
+    return days;
+  }
+
+  function openBookingModal() {
+    var days = nextBusinessDays(6);
+    var times = [
+      { value: "11:00", label: "11:00 AM" },
+      { value: "14:00", label: "2:00 PM" },
+      { value: "17:00", label: "5:00 PM" },
+      { value: "20:00", label: "8:00 PM" }
+    ];
+    var tz = Intl.DateTimeFormat().resolvedOptions().timeZone || "Local time";
+
+    var html =
+      '<div class="modal-head">' +
+        '<div><h2>Book your free strategy call</h2><p>30-minute store, ads &amp; creative review (' + esc(tz) + ').</p></div>' +
+        '<button class="modal-close" type="button" aria-label="Close">' + icons.close + "</button>" +
+      "</div>" +
+      '<form id="booking-modal-form">' +
+        '<span class="slot-label">1. Pick a day that suits you</span>' +
+        '<div class="slot-grid" data-slot-group="date">' +
+          days.map(function (d, i) {
+            return '<button class="slot-btn" type="button" data-val="' + d.iso + '" data-label="' + esc(d.label) + '" aria-pressed="' + (i === 0) + '">' + esc(d.label) + "</button>";
+          }).join("") +
+        "</div>" +
+        '<span class="slot-label">2. Pick a time that suits you</span>' +
+        '<div class="slot-grid" data-slot-group="time">' +
+          times.map(function (t, i) {
+            return '<button class="slot-btn" type="button" data-val="' + t.value + '" data-label="' + esc(t.label) + '" aria-pressed="' + (i === 1) + '">' + esc(t.label) + "</button>";
+          }).join("") +
+        "</div>" +
+        '<div class="form-grid">' +
+          '<div class="field"><label for="bm-name">Your name</label><input id="bm-name" name="name" type="text" required placeholder="Full name"></div>' +
+          '<div class="field"><label for="bm-email">Email</label><input id="bm-email" name="email" type="email" required placeholder="name@brand.com"></div>' +
+          '<div class="field"><label for="bm-store">Store URL <span class="opt">(optional)</span></label><input id="bm-store" name="store" type="text" placeholder="yourstore.com"></div>' +
+          '<div class="field"><label for="bm-focus">Main focus</label><select id="bm-focus" name="focus">' +
+            "<option>Full growth stack (Store + Ads + AI UGC)</option>" +
+            "<option>Shopify Store Design</option>" +
+            "<option>Meta Ads Management</option>" +
+            "<option>AI UGC Video Ads</option>" +
+          "</select></div>" +
+        "</div>" +
+        '<div class="form-foot">' +
+          "<small>Includes a free audit of your store and ad creatives.</small>" +
+          '<button class="btn btn--primary" type="submit">Send call request</button>' +
+        "</div>" +
+        '<div class="form-status" id="bm-status" role="status"></div>' +
+      "</form>";
+
+    var root = openModal("Book a free strategy call", html);
+
+    $$("[data-slot-group]", root).forEach(function (group) {
+      group.addEventListener("click", function (e) {
+        var btn = e.target.closest(".slot-btn");
+        if (!btn) return;
+        $$(".slot-btn", group).forEach(function (b) { b.setAttribute("aria-pressed", b === btn); });
+      });
+    });
+
+    $("#booking-modal-form", root).addEventListener("submit", function (e) {
+      e.preventDefault();
+      var form = e.currentTarget;
+      var name = form.elements.name.value.trim();
+      var email = form.elements.email.value.trim();
+      var storeUrl = form.elements.store.value.trim();
+      var focus = form.elements.focus.value;
+      var dateBtn = $('[data-slot-group="date"] .slot-btn[aria-pressed="true"]', root);
+      var timeBtn = $('[data-slot-group="time"] .slot-btn[aria-pressed="true"]', root);
+      var status = $("#bm-status", root);
+
+      if (name.length < 2 || !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) {
+        status.className = "form-status is-error";
+        status.innerHTML = "Please enter your name and a valid email address.";
+        return;
+      }
+
+      var dateIso = dateBtn.getAttribute("data-val");
+      var dateLabel = dateBtn.getAttribute("data-label");
+      var timeVal = timeBtn.getAttribute("data-val");
+      var timeLabel = timeBtn.getAttribute("data-label");
+
+      if (store.saveLead) {
+        store.saveLead({
+          type: "Strategy Call",
+          name: name,
+          email: email,
+          website: storeUrl,
+          services: focus,
+          slot: dateLabel + " at " + timeLabel + " (" + tz + ")"
+        });
+      }
+
+      var summary = "Hi WeDo Ecom, I'd like to book a free strategy call.\n" +
+        "Preferred time: " + dateLabel + " at " + timeLabel + " (" + tz + ")\n" +
+        "Name: " + name + "\nEmail: " + email +
+        (storeUrl ? "\nStore: " + storeUrl : "") + "\nFocus: " + focus;
+
+      var sent = deliver("Strategy call request: " + name, summary);
+      status.className = "form-status is-success";
+      status.innerHTML = deliveryHtml(sent, "bm-copy") + (sent.channel ? '<p style="margin:.75rem 0 0">We\'ll confirm the exact time when we reply.</p>' : "");
+      bindCopy(status, "bm-copy", summary);
+    });
+  }
+
+  function openConnectModal(kind, customMsg) {
+    var isWa = kind === "whatsapp";
+    var title = isWa ? "Chat with WeDo Ecom on WhatsApp" : "Discord Consultation";
+    var note = isWa
+      ? "Copy your pre-written intro below or send it through our inquiry form for a 1-day response."
+      : "Join our client consultation channel or send your project brief below and we'll invite you directly.";
+    var msg = customMsg || cfg.whatsappMessage || "Hi WeDo Ecom, I'd like to talk about growing my store.";
+    var mailHref = "mailto:" + encodeURIComponent(cfg.email || "") +
+      "?subject=" + encodeURIComponent("WeDo Ecom Inquiry") + "&body=" + encodeURIComponent(msg);
+
+    var root = openModal(title,
+      '<div class="modal-head">' +
+        '<div><h2>' + title + "</h2><p>" + note + "</p></div>" +
+        '<button class="modal-close" type="button" aria-label="Close">' + icons.close + "</button>" +
+      "</div>" +
+      '<div class="field"><label for="cm-msg">Your message</label>' +
+        '<textarea id="cm-msg" rows="4">' + esc(msg) + "</textarea>" +
+      "</div>" +
+      '<div class="btn-row" style="margin-top:1rem">' +
+        '<button class="btn btn--primary btn--sm" type="button" id="cm-copy">Copy message</button>' +
+        '<a class="btn btn--ghost btn--sm" href="' + mailHref + '">Send by email</a>' +
+        '<a class="btn btn--ghost btn--sm" href="contact.html#inquiry">Open full inquiry form</a>' +
+      "</div>"
+    );
+
+    $("#cm-copy", root).addEventListener("click", function () {
+      var val = $("#cm-msg", root).value;
+      if (navigator.clipboard) navigator.clipboard.writeText(val);
+      this.textContent = "Copied!";
+    });
+  }
+
   function wireLinks(root) {
     $$("[data-link]", root).forEach(function (a) {
       var type = a.getAttribute("data-link");
-      var href = type === "whatsapp" ? links.whatsapp(a.getAttribute("data-msg")) : links[type];
+      var customMsg = a.getAttribute("data-msg");
+      var href = type === "whatsapp" ? links.whatsapp(customMsg) : links[type];
       if (!href) return;
+
+      if (type === "booking" && isPlaceholder(cfg.bookingUrl, "booking")) {
+        a.setAttribute("href", "contact.html#inquiry");
+        if (!a.dataset.modalBound) {
+          a.dataset.modalBound = "1";
+          a.addEventListener("click", function (e) {
+            e.preventDefault();
+            openBookingModal();
+          });
+        }
+        return;
+      }
+
+      if (type === "discord" && isPlaceholder(cfg.discordInvite, "discord")) {
+        a.setAttribute("href", "contact.html#inquiry");
+        if (!a.dataset.modalBound) {
+          a.dataset.modalBound = "1";
+          a.addEventListener("click", function (e) {
+            e.preventDefault();
+            openConnectModal("discord", customMsg);
+          });
+        }
+        return;
+      }
+
+      if (type === "whatsapp" && isPlaceholder(cfg.whatsappNumber, "whatsapp")) {
+        a.setAttribute("href", "contact.html#inquiry");
+        if (!a.dataset.modalBound) {
+          a.dataset.modalBound = "1";
+          a.addEventListener("click", function (e) {
+            e.preventDefault();
+            openConnectModal("whatsapp", customMsg);
+          });
+        }
+        return;
+      }
+
       a.setAttribute("href", href);
       if (/^https?:/.test(href)) { a.setAttribute("target", "_blank"); a.setAttribute("rel", "noopener"); }
     });
@@ -57,9 +335,10 @@
 
   /* ---------- Header & footer ---------- */
   var nav = [
+    ["index.html", "Home", "home"],
     ["services.html", "Services", "services"],
-    ["case-studies.html", "Case studies", "cases"],
-    ["gallery.html", "Gallery", "gallery"],
+    ["case-studies.html", "Case Studies", "cases"],
+    ["gallery.html", "Creative Gallery", "gallery"],
     ["process.html", "Process", "process"],
     ["about.html", "About", "about"],
     ["contact.html", "Contact", "contact"]
@@ -80,7 +359,8 @@
           }).join("") + "</ul>" +
           '<a class="btn btn--primary btn--sm" data-link="booking">Book a free strategy call</a>' +
         "</nav>" +
-      "</div>";
+      "</div>" +
+      '<div class="scroll-progress" aria-hidden="true"></div>';
 
     var toggle = $(".nav-toggle", slot);
     toggle.addEventListener("click", function () {
@@ -98,7 +378,12 @@
     document.addEventListener("keydown", function (e) {
       if (e.key === "Escape" && slot.classList.contains("is-open")) toggle.click();
     });
-    var onScroll = function () { slot.classList.toggle("is-scrolled", window.scrollY > 10); };
+    var onScroll = function () {
+      slot.classList.toggle("is-scrolled", window.scrollY > 10);
+      var max = document.documentElement.scrollHeight - window.innerHeight;
+      var ratio = max > 0 ? Math.min(1, Math.max(0, window.scrollY / max)) : 0;
+      slot.style.setProperty("--scroll", ratio.toFixed(4));
+    };
     window.addEventListener("scroll", onScroll, { passive: true });
     onScroll();
   }
@@ -136,7 +421,7 @@
   }
 
   function renderFloatingWhatsApp() {
-    if (page === "contact") return;
+    if (page === "contact" || page === "studio") return;
     var a = document.createElement("a");
     a.className = "float-wa";
     a.setAttribute("data-link", "whatsapp");
@@ -145,9 +430,27 @@
     document.body.appendChild(a);
   }
 
-  /* ---------- Placeholder artwork ----------
-     Generates a simple on-brand SVG for items without a real image,
-     so the layout looks finished until real work is uploaded. */
+  /* ---------- Scroll Reveal ---------- */
+  function initReveal() {
+    var targets = $$("main .section, .pillars .pillar, .process-strip li, .step, .tier, .case-row, .g-item, .why-item, .mv-grid > div, .cta-band");
+    if (!targets.length) return;
+    var reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (reduce || !("IntersectionObserver" in window)) {
+      targets.forEach(function (el) { el.classList.add("is-visible"); });
+      return;
+    }
+    targets.forEach(function (el) { el.classList.add("reveal"); });
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (en) {
+        if (!en.isIntersecting) return;
+        en.target.classList.add("is-visible");
+        io.unobserve(en.target);
+      });
+    }, { threshold: 0.08, rootMargin: "0px 0px -40px 0px" });
+    targets.forEach(function (el) { io.observe(el); });
+  }
+
+  /* ---------- Placeholder artwork ---------- */
   function hash(s) { var h = 0; for (var i = 0; i < s.length; i++) { h = (h * 31 + s.charCodeAt(i)) | 0; } return Math.abs(h); }
 
   function placeholderArt(kind, seed, w, h) {
@@ -250,7 +553,6 @@
     stage.addEventListener("mouseleave", function () { if (!paused) { stage.classList.remove("is-paused"); schedule(); } });
     document.addEventListener("visibilitychange", function () { if (document.hidden) clearTimeout(timer); else schedule(); });
 
-    // headline lines can also switch the stage
     lines.forEach(function (l, k) { l.addEventListener("mouseenter", function () { if (!paused) { show(k); schedule(); } }); });
 
     show(0); schedule();
@@ -349,14 +651,28 @@
     var md = $('meta[name="description"]'); if (md) md.setAttribute("content", cs.summary);
 
     var ba = "";
-    if (cs.before && cs.after && (cs.before.caption || cs.before.image)) {
+    if (cs.before && cs.after && (cs.before.caption || cs.before.image || cs.after.caption || cs.after.image)) {
+      var mediaMarkup = function (obj, kind, label) {
+        return obj.image
+          ? '<img src="' + esc(obj.image) + '" alt="' + label + '" loading="lazy">'
+          : '<div class="ph-art">' + placeholderArt(kind, cs.slug + label, 800, 450) + "</div>";
+      };
       var fig = function (label, obj, kind) {
         return '<figure><div class="ba-media">' + (obj.image ? '<img src="' + esc(obj.image) + '" alt="' + label + '" loading="lazy">' :
           '<div class="ph-art">' + placeholderArt(kind, cs.slug + label, 480, 360) + "</div>") +
           "</div><figcaption><b>" + label + ".</b> " + esc(obj.caption) + "</figcaption></figure>";
       };
-      ba = '<div class="case-section"><h2>Before and after</h2><div class="before-after">' +
-        fig("Before", cs.before, "visuals") + fig("After", cs.after, "shopify") + "</div></div>";
+      ba = '<div class="case-section"><h2>Before and after</h2><div>' +
+        '<div class="ba-compare" style="--pos:50%">' +
+          '<div class="ba-layer">' + mediaMarkup(cs.before, "visuals", "Before") + "</div>" +
+          '<div class="ba-layer ba-after-clip">' + mediaMarkup(cs.after, "shopify", "After") + "</div>" +
+          '<span class="ba-pill ba-pill--before">Before</span>' +
+          '<span class="ba-pill ba-pill--after">After</span>' +
+          '<div class="ba-divider" aria-hidden="true"></div>' +
+          '<div class="ba-handle" aria-hidden="true">⇄</div>' +
+          '<input type="range" min="5" max="95" value="50" aria-label="Before and after comparison slider">' +
+        "</div>" +
+        '<div class="before-after">' + fig("Before", cs.before, "visuals") + fig("After", cs.after, "shopify") + "</div></div></div>";
     }
 
     var idx = all.indexOf(cs), next = all[(idx + 1) % all.length];
@@ -389,6 +705,13 @@
         "<p>Tell us about your brand and we'll show you where the quickest wins are.</p></div>" +
         '<div class="btn-row"><a class="btn btn--primary" data-link="booking">Book a free strategy call</a>' +
         (next && next !== cs ? '<a class="btn btn--ghost" href="case-study.html?slug=' + esc(next.slug) + '">Next case study</a>' : "") + "</div></div></section>";
+
+    var slider = $(".ba-compare input[type=range]", root);
+    if (slider) {
+      slider.addEventListener("input", function () {
+        slider.parentElement.style.setProperty("--pos", slider.value + "%");
+      });
+    }
     wireLinks(root);
   }
 
@@ -435,7 +758,6 @@
     }
     draw("all");
 
-    // lightbox
     var lb = document.createElement("div");
     lb.className = "lightbox"; lb.setAttribute("role", "dialog"); lb.setAttribute("aria-modal", "true"); lb.setAttribute("aria-label", "Creative preview");
     lb.innerHTML = '<button class="lb-btn lb-close" type="button" aria-label="Close">' + icons.close + "</button>" +
@@ -469,7 +791,7 @@
       if (e.key === "Escape") close();
       if (e.key === "ArrowLeft") open(cur - 1);
       if (e.key === "ArrowRight") open(cur + 1);
-      if (e.key === "Tab") { // keep focus inside the dialog
+      if (e.key === "Tab") {
         var f = $$("button, video", lb), first = f[0], last = f[f.length - 1];
         if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
         else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
@@ -477,14 +799,33 @@
     });
   }
 
-  /* ---------- Contact form ---------- */
+  /* ---------- Contact form + project summary ---------- */
+  function buildGrowthBrief(d) {
+    var tier = "Launch Plan";
+    if (/\$5,000|\$10,000/i.test(d.budget)) tier = "Scale Plan";
+    else if (/\$2,000/i.test(d.budget)) tier = "Growth Plan";
+
+    var ch = d.challenges.toLowerCase();
+    var focus = "Full-funnel store, creative & Meta ad audit";
+    if (/convert|cart|checkout|slow|website|store/i.test(ch)) focus = "Product page conversion, trust signals & checkout flow";
+    else if (/creative|video|hook|fatigue|ugc/i.test(ch)) focus = "Fresh AI UGC hooks & creative testing velocity";
+    else if (/roas|cpa|cost|scale|ads|meta/i.test(ch)) focus = "Campaign consolidation & winning ad-set scaling";
+
+    return {
+      recommendedTier: tier,
+      priorityFocus: focus,
+      weekOneAction: d.website
+        ? "Audit " + d.website + " + review ad account structure & top 3 competitor angles"
+        : "Storefront blueprint + 3 AI UGC script hooks tailored to " + d.business
+    };
+  }
+
   function initForm() {
     var form = $("#inquiry-form");
     if (!form) return;
     var status = $(".form-status", form);
     var params = new URLSearchParams(location.search);
 
-    // pre-select service / package when coming from the services page
     var svc = params.get("service");
     if (svc) { var box = $('input[name="services"][value="' + svc + '"]', form); if (box) box.checked = true; }
     var pkg = params.get("package");
@@ -535,41 +876,66 @@
       d.services = $$('input[name="services"]:checked', form).map(function (c) { return c.getAttribute("data-label"); }).join(", ");
       return d;
     }
-    function waSummary(d) {
-      return "Hi WeDo Ecom, I'd like to discuss a project.\n\n" +
+    function briefText(d, brief) {
+      return "Hi WeDo Ecom, here is my project inquiry.\n\n" +
         "Name: " + d.name + "\nBusiness: " + d.business + "\nEmail: " + d.email +
-        (d.website ? "\nStore: " + d.website : "") + "\nServices: " + d.services + "\nMonthly ad budget: " + d.budget +
-        "\n\nChallenges: " + d.challenges + (d.goals ? "\n\nGoals: " + d.goals : "");
+        (d.website ? "\nStore: " + d.website : "") +
+        "\nServices: " + d.services +
+        "\nMonthly ad budget: " + d.budget +
+        
+        "\n\nChallenges: " + d.challenges +
+        (d.goals ? "\n\nGoals: " + d.goals : "");
     }
-    function show(type, html) { status.className = "form-status is-" + type; status.innerHTML = html; status.focus(); }
+    function renderConfirmation(d, brief, sentToGoogle) {
+      var fullBrief = briefText(d, brief);
+      var head = sentToGoogle
+        ? "<b>Inquiry sent.</b> Thanks, " + esc(d.name.split(" ")[0]) + ". We'll review your store and reply within one working day." +
+          '<div class="btn-row" style="margin-top:.85rem"><button class="btn btn--ghost btn--sm" type="button" id="ai-copy-brief">Copy my details</button></div>'
+        : deliveryHtml(deliver("Growth inquiry: " + d.business, fullBrief), "ai-copy-brief");
+
+      status.className = "form-status is-success";
+      status.innerHTML = head +
+        '<div class="ai-brief" style="margin-top:1rem">' +
+          '<p style="margin:0;color:var(--muted)">Your project summary</p>' +
+          '<div class="ai-brief-grid">' +
+            '<div class="ai-brief-box"><b>Suggested starting package</b><span>' + esc(brief.recommendedTier) + "</span></div>" +
+            '<div class="ai-brief-box"><b>Where we\'d start</b><span>' + esc(brief.priorityFocus) + "</span></div>" +
+          "</div>" +
+          '<div class="ai-brief-box"><b>First week</b><p>' + esc(brief.weekOneAction) + "</p></div>" +
+          '<p style="margin:0;color:var(--faint);font-size:var(--fs-xs)">A first suggestion based on your answers. We\'ll confirm the plan after looking at your store.</p>' +
+        "</div>";
+      bindCopy(status, "ai-copy-brief", fullBrief);
+      status.focus();
+    }
 
     form.addEventListener("submit", function (e) {
       e.preventDefault();
-      if (form.elements.company_site && form.elements.company_site.value) return; // spam honeypot
+      if (form.elements.company_site && form.elements.company_site.value) return;
       if (!validate()) return;
-      var d = collect(), gf = cfg.googleForm || {}, btn = $("button[type=submit]", form);
-      var waLink = links.whatsapp(waSummary(d));
+      var d = collect();
+      var brief = buildGrowthBrief(d);
+      var gf = cfg.googleForm || {}, btn = $("button[type=submit]", form);
+
+      if (store.saveLead) {
+        store.saveLead(Object.assign({ type: "Inquiry Form", recommendedTier: brief.recommendedTier }, d));
+      }
 
       if (!gf.formId) {
-        // No Google Form connected yet: send the inquiry through WhatsApp.
-        window.open(waLink, "_blank", "noopener");
-        show("success", "<b>Almost done.</b> WhatsApp opened with your details filled in. Press send there and we'll reply within one working day. " +
-          'If it didn\'t open, <a class="text-link" href="' + esc(waLink) + '" target="_blank" rel="noopener">open WhatsApp</a>.');
+        renderConfirmation(d, brief, false);
         return;
       }
+
       var body = new URLSearchParams();
       Object.keys(gf.fields || {}).forEach(function (k) { if (gf.fields[k] && d[k] != null) body.append(gf.fields[k], d[k]); });
       btn.disabled = true; btn.textContent = "Sending…";
       fetch("https://docs.google.com/forms/d/e/" + gf.formId + "/formResponse", { method: "POST", mode: "no-cors", body: body })
         .then(function () {
           form.reset();
-          show("success", "<b>Inquiry sent.</b> Thanks, " + esc(d.name.split(" ")[0]) + ". We'll review your store and reply within one working day. " +
-            'Want a faster reply? <a class="text-link" data-link="whatsapp">Message us on WhatsApp</a>.');
-          wireLinks(status);
+          renderConfirmation(d, brief, true);
         })
         .catch(function () {
-          show("error", "<b>Your inquiry didn't send.</b> Check your internet connection and try again, or " +
-            '<a class="text-link" href="' + esc(waLink) + '" target="_blank" rel="noopener">send it on WhatsApp</a> instead.');
+          // The Google Form didn't take it: fall back to WhatsApp/email.
+          renderConfirmation(d, brief, false);
         })
         .then(function () { btn.disabled = false; btn.textContent = "Send inquiry"; });
     });
@@ -586,4 +952,5 @@
   renderGallery();
   initForm();
   wireLinks(document);
+  initReveal();
 })();

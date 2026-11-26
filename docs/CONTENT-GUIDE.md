@@ -1,6 +1,8 @@
 # Content guide — how to update the WeDo Ecom website
 
-You don't need to touch any HTML to update the main content. Everything below is done by editing small JavaScript files that read like lists. Open them in VS Code, change the text between the quotes, save, and refresh the page.
+You can update content in **two ways**:
+1. **Directly in the website** via **[Studio Manager (`studio.html`)](../studio.html)** — open `your-site/studio.html`, add or edit case studies, gallery items, prices and contact links, and preview them in your browser. Edits stay in your browser only until you click **Export**, then upload the exported files to the same place on GitHub (`assets/js/` or `assets/js/data/`).
+2. **Directly in code** by editing the small JavaScript files listed below. Open them in VS Code, change the text between the quotes, save, and refresh the page.
 
 > **Tip:** keep the commas and quotes exactly as they are. If a page suddenly looks empty after an edit, a comma or quote is usually missing. Press `F12` in the browser and check the **Console** tab; it shows the line with the problem.
 
