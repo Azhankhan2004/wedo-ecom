@@ -1,0 +1,149 @@
+/* ==========================================================================
+   WeDo Ecom: motion & effects layer (fx.css)
+   Loaded after main.css. Everything here is decoration on top of the base
+   design, and it all switches off for people who prefer reduced motion.
+   ========================================================================== */
+
+/* ---------- Intro curtain (first visit per session) ---------- */
+.fx-intro {
+  position: fixed; inset: 0; z-index: 200; background: var(--black);
+  display: grid; place-items: center; pointer-events: none;
+  animation: fx-intro-out .7s cubic-bezier(.7, 0, .2, 1) 1.05s forwards;
+}
+.fx-intro__mark { display: flex; align-items: center; gap: .9rem; font-weight: 800; font-size: clamp(1.6rem, 4vw, 2.6rem); letter-spacing: -0.03em; font-variation-settings: "wdth" 122; color: var(--text); }
+.fx-intro__mark svg { width: 1.6em; height: 1.6em; animation: fx-pop .6s cubic-bezier(.2, 1.4, .4, 1) both; }
+.fx-intro__mark span { display: inline-block; clip-path: inset(0 100% 0 0); animation: fx-wipe .55s cubic-bezier(.7, 0, .2, 1) .25s forwards; }
+.fx-intro__mark span b { color: var(--muted); font-weight: 500; }
+.fx-intro__bar { position: absolute; left: 0; bottom: 0; height: 3px; width: 0; background: var(--lime); animation: fx-bar 1s cubic-bezier(.6, 0, .2, 1) forwards; }
+@keyframes fx-intro-out { to { clip-path: inset(0 0 100% 0); visibility: hidden; } }
+@keyframes fx-pop { from { transform: scale(.2) rotate(-30deg); opacity: 0; } }
+@keyframes fx-wipe { to { clip-path: inset(0 0 0 0); } }
+@keyframes fx-bar { to { width: 100%; } }
+.fx-intro-done .fx-intro { display: none; }
+
+/* ---------- Hero: living dot field + cursor aura ---------- */
+.hero { --mx: 65%; --my: 35%; isolation: isolate; }
+.fx-field { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 0; pointer-events: none; opacity: 0; transition: opacity 1.2s ease; }
+.fx-field.is-on { opacity: 1; }
+@media (min-width: 961px) {
+  .fx-field { -webkit-mask-image: linear-gradient(100deg, rgba(0,0,0,.18) 0%, rgba(0,0,0,.25) 38%, #000 58%); mask-image: linear-gradient(100deg, rgba(0,0,0,.18) 0%, rgba(0,0,0,.25) 38%, #000 58%); }
+}
+@media (max-width: 960px) {
+  .fx-field { -webkit-mask-image: linear-gradient(180deg, transparent 35%, #000 75%); mask-image: linear-gradient(180deg, transparent 35%, #000 75%); }
+}
+.hero::before {
+  /* the aura now follows the cursor */
+  width: 760px; height: 760px; right: auto; top: auto;
+  left: var(--mx); top: var(--my); transform: translate(-50%, -50%);
+  transition: left .6s cubic-bezier(.2, .7, .2, 1), top .6s cubic-bezier(.2, .7, .2, 1);
+  z-index: 0;
+}
+
+/* headline: words rise out of a mask, the live line shimmers */
+.fx-word { display: inline-block; overflow: hidden; vertical-align: top; padding-bottom: .08em; margin-bottom: -.08em; }
+.fx-word > i { display: inline-block; font-style: normal; transform: translateY(105%); animation: fx-word-in .9s cubic-bezier(.2, .8, .2, 1) forwards; animation-delay: calc(var(--i) * 55ms + .15s); }
+@keyframes fx-word-in { to { transform: none; } }
+.hero h1 .line { animation: none !important; }
+.hero h1 .line:not(.is-dim) .fx-word > i {
+  background: linear-gradient(100deg, var(--text) 0%, var(--text) 38%, var(--lime-bright) 50%, var(--text) 62%, var(--text) 100%);
+  background-size: 250% 100%; -webkit-background-clip: text; background-clip: text; color: transparent;
+  animation: fx-word-in .9s cubic-bezier(.2, .8, .2, 1) forwards, fx-shine 3.2s linear 1.4s infinite;
+  animation-delay: calc(var(--i) * 55ms + .15s), calc(var(--i) * 40ms + 1.4s);
+}
+@keyframes fx-shine { from { background-position: 125% 0; } to { background-position: -125% 0; } }
+
+/* stage: tilts toward the cursor in 3D */
+.stage { perspective: 1200px; }
+.stage-screen { transform-style: preserve-3d; transition: transform .5s cubic-bezier(.2, .7, .2, 1), box-shadow .5s; will-change: transform; }
+.stage.is-tilting .stage-screen { transition: transform .12s linear, box-shadow .3s; box-shadow: 0 40px 90px -30px rgba(196, 207, 134, .25); }
+.stage-screen::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none; border-radius: inherit;
+  background: radial-gradient(420px circle at var(--gx, 50%) var(--gy, 0%), rgba(255, 255, 255, .07), transparent 60%);
+}
+
+/* ---------- Marquee band ---------- */
+.fx-marquee {
+  position: relative; overflow: hidden; border-block: 1px solid var(--line-soft); background: var(--grey-950);
+  padding-block: 1.4rem; transform: rotate(-1.2deg); margin: -1rem -2vw 0; z-index: 2;
+}
+.fx-marquee__track { display: flex; width: max-content; animation: fx-marquee 32s linear infinite; }
+.fx-marquee:hover .fx-marquee__track { animation-play-state: paused; }
+.fx-marquee__group { display: flex; align-items: center; gap: 2.2rem; padding-right: 2.2rem; }
+.fx-marquee__item { font-size: clamp(1.6rem, 1rem + 2.4vw, 3rem); font-weight: 800; letter-spacing: -0.03em; font-variation-settings: "wdth" 122; white-space: nowrap; color: var(--text); }
+.fx-marquee__item.is-outline { color: transparent; -webkit-text-stroke: 1.5px var(--lime); }
+.fx-marquee__star { width: 1.6rem; height: 1.6rem; color: var(--lime); flex: none; animation: fx-spin 6s linear infinite; }
+@keyframes fx-marquee { to { transform: translateX(-50%); } }
+@keyframes fx-spin { to { transform: rotate(360deg); } }
+
+/* ---------- Buttons: magnetic pull + light sweep ---------- */
+.btn { position: relative; overflow: hidden; isolation: isolate; transition: background .2s, color .2s, border-color .2s, transform .35s cubic-bezier(.2, .7, .2, 1), box-shadow .3s; }
+.btn::after {
+  content: ""; position: absolute; inset: -2px; z-index: -1; pointer-events: none;
+  background: linear-gradient(115deg, transparent 30%, rgba(255, 255, 255, .45) 50%, transparent 70%);
+  transform: translateX(-120%); transition: transform .7s cubic-bezier(.2, .7, .2, 1);
+}
+.btn:hover::after { transform: translateX(120%); }
+.btn--primary:hover { box-shadow: 0 10px 34px -8px rgba(196, 207, 134, .55); }
+.btn--ghost::after { background: linear-gradient(115deg, transparent 30%, rgba(196, 207, 134, .18) 50%, transparent 70%); }
+
+/* ---------- Links: rolling text + growing underline ---------- */
+.fx-roll { position: relative; display: inline-flex; overflow: hidden; vertical-align: bottom; }
+.fx-roll > span { display: inline-block; transition: transform .45s cubic-bezier(.7, 0, .2, 1); }
+.fx-roll > span + span { position: absolute; left: 0; top: 0; transform: translateY(105%); color: var(--lime); }
+a:hover > .fx-roll > span:first-child, a:focus-visible > .fx-roll > span:first-child { transform: translateY(-105%); }
+a:hover > .fx-roll > span + span, a:focus-visible > .fx-roll > span + span { transform: none; }
+
+.text-link { border-bottom: 0; padding-bottom: 3px; background: linear-gradient(var(--lime), var(--lime)) left bottom / 0% 1px no-repeat, linear-gradient(rgba(196, 207, 134, .3), rgba(196, 207, 134, .3)) left bottom / 100% 1px no-repeat; transition: background-size .45s cubic-bezier(.7, 0, .2, 1), color .2s; }
+.text-link:hover { background-size: 100% 1px, 100% 1px; }
+.text-link::after { content: ""; display: inline-block; width: .55em; height: .55em; margin-left: .35em; border-right: 2px solid currentColor; border-top: 2px solid currentColor; transform: rotate(45deg) translate(-2px, 1px); transition: transform .3s cubic-bezier(.2, .7, .2, 1); vertical-align: middle; }
+.text-link:hover::after { transform: rotate(45deg) translate(1px, -2px); }
+
+.site-footer a:not(.logo):not(.btn) { background: linear-gradient(var(--lime), var(--lime)) left bottom / 0% 1px no-repeat; transition: background-size .4s cubic-bezier(.7, 0, .2, 1), color .2s; padding-bottom: 2px; }
+.site-footer a:not(.logo):not(.btn):hover { background-size: 100% 1px; }
+
+.logo .logo-mark { transition: transform .6s cubic-bezier(.2, 1.4, .4, 1); }
+.logo:hover .logo-mark { transform: rotate(-12deg) scale(1.08); }
+
+/* ---------- Cards: glow that follows the cursor ---------- */
+.fx-glow { position: relative; }
+.fx-glow::before {
+  content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; z-index: 0; opacity: 0;
+  background: radial-gradient(360px circle at var(--x, 50%) var(--y, 50%), rgba(196, 207, 134, .11), transparent 65%);
+  transition: opacity .35s;
+}
+.fx-glow:hover::before { opacity: 1; }
+.fx-glow > * { position: relative; z-index: 1; }
+.case-row.fx-glow > *, .g-item.fx-glow > * { position: relative; }
+.tier, .channel, .case-row, .g-item, .why-item { transition: transform .45s cubic-bezier(.2, .7, .2, 1), border-color .3s; }
+.tier:hover, .channel:hover { transform: translateY(-4px); }
+.pillar .verb { display: inline-block; transition: transform .5s cubic-bezier(.2, 1.4, .4, 1), letter-spacing .5s; }
+.pillar:hover .verb { transform: translateX(6px) skewX(-6deg); }
+.chip, .filter-btn { transition: all .25s cubic-bezier(.2, .7, .2, 1); }
+.chip:hover, .filter-btn:hover { transform: translateY(-2px); }
+
+/* section headings rise word by word */
+.fx-split .fx-word > i { animation: none; transform: translateY(105%); transition: transform .9s cubic-bezier(.2, .8, .2, 1); transition-delay: calc(var(--i) * 45ms); }
+.fx-split.is-visible .fx-word > i, .is-visible .fx-split .fx-word > i { transform: none; }
+
+/* ---------- Custom cursor (mouse only) ---------- */
+.fx-cursor, .fx-cursor-ring { position: fixed; left: 0; top: 0; z-index: 150; pointer-events: none; border-radius: 50%; }
+.fx-cursor { width: 8px; height: 8px; margin: -4px 0 0 -4px; background: var(--lime); mix-blend-mode: difference; }
+.fx-cursor-ring { width: 40px; height: 40px; margin: -20px 0 0 -20px; border: 1.5px solid rgba(196, 207, 134, .55); transition: width .3s, height .3s, margin .3s, background .3s, border-color .3s, opacity .3s; }
+.fx-cursor-ring.is-hover { width: 70px; height: 70px; margin: -35px 0 0 -35px; background: rgba(196, 207, 134, .1); border-color: var(--lime); }
+.fx-cursor-ring.is-down { width: 30px; height: 30px; margin: -15px 0 0 -15px; }
+.fx-cursor.is-hidden, .fx-cursor-ring.is-hidden { opacity: 0; }
+
+/* ---------- Scroll progress (lime line under the header) ---------- */
+.scroll-progress { box-shadow: 0 0 12px rgba(196, 207, 134, .6); }
+
+/* ---------- Reduced motion: keep it calm ---------- */
+@media (prefers-reduced-motion: reduce) {
+  .fx-intro, .fx-cursor, .fx-cursor-ring { display: none !important; }
+  .fx-word > i, .fx-split .fx-word > i { transform: none !important; animation: none !important; }
+  .fx-marquee__track { animation: none; }
+  .stage-screen { transform: none !important; }
+}
+@media (hover: none), (pointer: coarse) {
+  .fx-cursor, .fx-cursor-ring { display: none !important; }
+}
+#main { overflow-x: clip; }
