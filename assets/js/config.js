@@ -43,6 +43,10 @@ WEDO.config = {
     tiktok: ""
   },
 
+  // Client portal sign-in page. Leave empty to hide the "Client login" links
+  // (the portal only works once the site runs on Cloudflare).
+  portalLogin: "",
+
   // Currency shown next to package prices
   currency: "$"
 };

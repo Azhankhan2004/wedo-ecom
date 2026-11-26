@@ -154,3 +154,7 @@ a:hover > .fx-roll > span + span, a:focus-visible > .fx-roll > span + span { tra
 .nav-login:hover { color: var(--lime); }
 @media (min-width: 961px) and (max-width: 1240px) { .nav { gap: 1.1rem; } .nav-links { gap: 1.05rem; } }
 @media (max-width: 960px) { .nav-login { font-size: var(--fs-lg); padding: .7rem 0; color: var(--text); } }
+
+/* Footer credit */
+.site-footer .footer-base a.credit-link { color: var(--text); font-weight: 600; background: linear-gradient(var(--lime), var(--lime)) left bottom / 100% 1px no-repeat; padding-bottom: 1px; transition: color .2s, background-size .3s; }
+.site-footer .footer-base a.credit-link:hover { color: var(--lime); }
