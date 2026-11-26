@@ -147,3 +147,10 @@ a:hover > .fx-roll > span + span, a:focus-visible > .fx-roll > span + span { tra
   .fx-cursor, .fx-cursor-ring { display: none !important; }
 }
 #main { overflow-x: clip; }
+
+/* Client login link in the header */
+.nav-login { display: inline-flex; align-items: center; gap: .4rem; font-size: var(--fs-sm); font-weight: 600; color: var(--muted); padding: .4rem .2rem; transition: color .2s; white-space: nowrap; }
+.nav-login::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--lime); box-shadow: 0 0 0 3px rgba(196, 207, 134, .18); }
+.nav-login:hover { color: var(--lime); }
+@media (min-width: 961px) and (max-width: 1240px) { .nav { gap: 1.1rem; } .nav-links { gap: 1.05rem; } }
+@media (max-width: 960px) { .nav-login { font-size: var(--fs-lg); padding: .7rem 0; color: var(--text); } }

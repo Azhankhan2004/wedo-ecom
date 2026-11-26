@@ -357,6 +357,7 @@
           '<ul class="nav-links">' + nav.map(function (n) {
             return '<li><a href="' + n[0] + '"' + (n[2] === current ? ' aria-current="page"' : "") + ">" + n[1] + "</a></li>";
           }).join("") + "</ul>" +
+          '<a class="nav-login" href="/portal/login.html">Client login</a>' +
           '<a class="btn btn--primary btn--sm" data-link="booking">Book a free strategy call</a>' +
         "</nav>" +
       "</div>" +
@@ -409,7 +410,8 @@
             '<li><a href="case-studies.html">Case studies</a></li>' +
             '<li><a href="gallery.html">Creative gallery</a></li>' +
             '<li><a href="process.html">Growth process</a></li>' +
-            '<li><a href="about.html">About us</a></li></ul></div>' +
+            '<li><a href="about.html">About us</a></li>' +
+            '<li><a href="/portal/login.html">Client login</a></li></ul></div>' +
           "<div><h4>Talk to us</h4><ul>" +
             '<li><a data-link="whatsapp">WhatsApp</a></li>' +
             '<li><a data-link="discord">Discord</a></li>' +

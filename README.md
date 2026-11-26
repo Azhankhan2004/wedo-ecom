@@ -23,6 +23,10 @@ Built as a fast, dependency-free static site (HTML, CSS and vanilla JavaScript).
 | Studio Manager | `studio.html` | Private editor (not in the menus) to preview case studies, gallery, prices and links in your browser, then export the files to upload to GitHub |
 | 404 | `404.html` | Not-found page |
 
+## Client portal
+
+A private dashboard for clients plus an admin area for the team, running free on Cloudflare (Pages + Functions + D1). See **[docs/PORTAL.md](docs/PORTAL.md)** for setup and daily use.
+
 ## Folder structure
 
 ```

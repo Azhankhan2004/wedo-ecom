@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Sign in | WeDo Ecom Client Portal</title>
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="theme-color" content="#050506">
+  <link rel="icon" href="/assets/img/favicon.svg" type="image/svg+xml">
+  <link rel="manifest" href="/portal/manifest.webmanifest">
+  <link rel="apple-touch-icon" href="/portal/icon-192.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,100..900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/portal/portal.css">
+</head>
+<body>
+  <div class="auth">
+    <aside class="auth-art" aria-hidden="true">
+      <canvas id="art"></canvas>
+      <a class="brand" href="/" tabindex="-1"><span id="logo-slot"></span>WeDo<span>Ecom</span></a>
+      <h2>Your store, your project, <span>all in one place.</span></h2>
+      <p class="muted">Client portal for WeDo Ecom: project progress, updates and invoices.</p>
+    </aside>
+
+    <main class="auth-main">
+      <!-- Sign in -->
+      <section class="auth-card fade-in" id="mode-login" hidden>
+        <a class="brand" href="/"><span class="logo-slot"></span>WeDo<span>Ecom</span></a>
+        <div><h1>Welcome back</h1><p class="sub">Sign in to see your project, updates and invoices.</p></div>
+        <form class="grid" id="login-form" novalidate>
+          <div class="field"><label for="email">Email</label><input id="email" name="email" type="email" autocomplete="username" required></div>
+          <div class="field"><label for="password">Password</label><input id="password" name="password" type="password" autocomplete="current-password" required></div>
+          <div class="alert alert--error" data-error hidden></div>
+          <button class="btn btn--primary" type="submit">Sign in</button>
+        </form>
+        <p class="note">Forgot your password? Message us on WhatsApp or email and we'll send you a new one.</p>
+      </section>
+
+      <!-- First-time setup: create the first admin account -->
+      <section class="auth-card fade-in" id="mode-setup" hidden>
+        <a class="brand" href="/"><span class="logo-slot"></span>WeDo<span>Ecom</span></a>
+        <div><h1>Set up your portal</h1><p class="sub">Create the first admin account for the WeDo Ecom team. You'll need the setup key you saved in Cloudflare.</p></div>
+        <form class="grid" id="setup-form" novalidate>
+          <div class="field"><label for="s-key">Setup key</label><input id="s-key" name="setupKey" type="password" autocomplete="off" required></div>
+          <div class="field"><label for="s-name">Your name</label><input id="s-name" name="name" type="text" autocomplete="name" required></div>
+          <div class="field"><label for="s-email">Your email</label><input id="s-email" name="email" type="email" autocomplete="username" required></div>
+          <div class="field"><label for="s-pass">Choose a password</label><input id="s-pass" name="password" type="password" autocomplete="new-password" minlength="10" required><span class="note">At least 10 characters.</span></div>
+          <div class="alert alert--error" data-error hidden></div>
+          <button class="btn btn--primary" type="submit">Create admin account</button>
+        </form>
+      </section>
+
+      <!-- First sign-in: replace the temporary password -->
+      <section class="auth-card fade-in" id="mode-set-password" hidden>
+        <a class="brand" href="/"><span class="logo-slot"></span>WeDo<span>Ecom</span></a>
+        <div><h1>Choose your password</h1><p class="sub">You signed in with a temporary password. Pick your own to continue.</p></div>
+        <form class="grid" id="setpw-form" novalidate>
+          <div class="field"><label for="p-cur">Temporary password</label><input id="p-cur" name="current" type="password" autocomplete="current-password" required></div>
+          <div class="field"><label for="p-new">New password</label><input id="p-new" name="next" type="password" autocomplete="new-password" minlength="10" required><span class="note">At least 10 characters.</span></div>
+          <div class="alert alert--error" data-error hidden></div>
+          <button class="btn btn--primary" type="submit">Save and continue</button>
+        </form>
+      </section>
+    </main>
+  </div>
+
+  <script src="/portal/portal.js"></script>
+  <script>
+  (function () {
+    var P = Portal;
+    document.querySelectorAll(".logo-slot, #logo-slot").forEach(function (s) { s.outerHTML = P.logo; });
+    var next = new URLSearchParams(location.search).get("next");
+    function show(mode) {
+      ["login", "setup", "set-password"].forEach(function (m) { document.getElementById("mode-" + m).hidden = m !== mode; });
+      var first = document.querySelector("#mode-" + mode + " input");
+      if (first) first.focus();
+    }
+    function home(role) {
+      var safe = next && /^\/portal\//.test(next) ? next : null;
+      location.href = safe || (role === "admin" ? "/portal/admin.html" : "/portal/");
+    }
+
+    P.bindForm(document.getElementById("login-form"), function (d) {
+      return P.api("/auth/login", { method: "POST", body: d, allow401: true }).then(function (r) {
+        if (r.mustChangePassword) { document.getElementById("p-cur").value = d.password; show("set-password"); document.getElementById("p-new").focus(); }
+        else home(r.role);
+      });
+    });
+    P.bindForm(document.getElementById("setup-form"), function (d) {
+      return P.api("/auth/setup", { method: "POST", body: d, allow401: true }).then(function () { home("admin"); });
+    });
+    P.bindForm(document.getElementById("setpw-form"), function (d) {
+      return P.api("/auth/password", { method: "POST", body: d }).then(function () {
+        return P.api("/auth/me").then(function (r) { home(r.user.role); });
+      });
+    });
+
+    // Decide which screen to show
+    P.api("/auth/status", { allow401: true }).then(function (s) {
+      if (s.needsSetup) return show("setup");
+      return P.api("/auth/me", { allow401: true }).then(function (r) {
+        if (r.user.mustChangePassword) show("set-password"); else home(r.user.role);
+      }).catch(function () { show(location.hash === "#set-password" ? "login" : "login"); });
+    }).catch(function (e) {
+      show("login");
+      var box = document.querySelector("#mode-login [data-error]");
+      box.textContent = e.message; box.hidden = false;
+    });
+
+    // Decorative dot field on the left panel
+    var c = document.getElementById("art"), ctx = c.getContext && c.getContext("2d");
+    if (!ctx || matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    var t = 0;
+    function size() { var r = c.getBoundingClientRect(), dpr = Math.min(devicePixelRatio || 1, 2); c.width = r.width * dpr; c.height = r.height * dpr; ctx.setTransform(dpr, 0, 0, dpr, 0, 0); }
+    size(); addEventListener("resize", size);
+    (function frame() {
+      var W = c.clientWidth, H = c.clientHeight; t += 0.012;
+      ctx.clearRect(0, 0, W, H);
+      for (var z = 0; z < 26; z++) {
+        var s = 300 / (300 + z * 22), y0 = H * 0.5 + (H * 0.5) * (1 - z / 26);
+        for (var x = -30; x <= 30; x++) {
+          var sx = W * 0.5 + x * 28 * s * 1.2, sy = y0 - (Math.sin(x * 0.25 + t * 2) * 10 + Math.cos(z * 0.35 + t * 1.5) * 12) * s * 1.6;
+          if (sx < 0 || sx > W) continue;
+          ctx.fillStyle = "rgba(196,207,134," + Math.min(0.55, 0.08 + s * 0.45) + ")";
+          ctx.beginPath(); ctx.arc(sx, sy, 1.2 * s + 0.3, 0, 6.283); ctx.fill();
+        }
+      }
+      if (document.visibilityState === "visible") requestAnimationFrame(frame); else setTimeout(frame, 500);
+    })();
+  })();
+  </script>
+</body>
+</html>
